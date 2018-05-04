@@ -10,12 +10,25 @@ import UIKit
 
 class KW_AttributeTextView: UIView {
 
-    /*
-    // Only override draw() if you perform custom drawing.
-    // An empty implementation adversely affects performance during animation.
-    override func draw(_ rect: CGRect) {
-        // Drawing code
+    private var text: KW_AttributeTextData?;
+    
+    init(frame: CGRect, data: KW_AttributeTextData) {
+        super.init(frame: frame);
+        self.text = data;
+        self.backgroundColor = UIColor.white;
     }
-    */
-
+    
+    override func draw(_ rect: CGRect) {
+        super.draw(frame);
+        let context = UIGraphicsGetCurrentContext();
+        context?.textMatrix = CGAffineTransform.identity;
+        context?.translateBy(x: 0, y: self.bounds.size.height);
+        context?.scaleBy(x: 1.0, y: -1.0);
+        CTFrameDraw((self.text?.ctFrame)!, context!);
+    }
+    
+    required init?(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
 }
