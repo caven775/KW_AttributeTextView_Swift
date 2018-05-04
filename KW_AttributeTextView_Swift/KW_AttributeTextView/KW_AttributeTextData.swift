@@ -10,9 +10,9 @@ import UIKit
 import CoreText
 
 struct KWHyperLinkTextKey: Hashable {
-    var text     = "HyperLinkText";
-    var range    = "HyperLinkTextRange";
-    var index    = "HyperLinkTextIndex";
+    static var text     = "HyperLinkText";
+    static var range    = "HyperLinkTextRange";
+    static var index    = "HyperLinkTextIndex";
 }
 
 class KW_AttributeTextData: NSObject {
@@ -25,9 +25,9 @@ class KW_AttributeTextData: NSObject {
     var wordSpacing: CGFloat? = 0;
     var model: CTLineBreakMode? = CTLineBreakMode.byWordWrapping;
     var textAligment: CTTextAlignment? = CTTextAlignment.left;
-    var hyperLinks: [String: [String: Any]]?
+    var hyperLinks: [String: [NSAttributedStringKey: Any]]?
     private var tempText: String = "";
-    private (set) var textRealSize: CGSize?
+    private (set) var textRealSize: CGSize? = CGSize.zero;
     private (set) var ctFrame: CTFrame?;
     private (set) lazy var allLinkTextRanges: [String: Array<Any>] = {
         return [:];
@@ -39,8 +39,33 @@ class KW_AttributeTextData: NSObject {
     
     func kw_textIndexFromTouchedPoint(point: CGPoint) -> CFIndex {
         
-        return -1;
+        let frame = CGRect.init(x: 0, y: 0, width: self.textRealSize!.width, height: self.textRealSize!.height);
+        let lines = CTFrameGetLines(self.ctFrame!);
+        let count = CFArrayGetCount(lines);
+        if count == 0 {
+            return -1;
+        }
+        var origins = [CGPoint](repeating: CGPoint.zero, count: count);
+        CTFrameGetLineOrigins(self.ctFrame!, CFRange.init(location: 0, length: 0), &origins);
+        var transform = CGAffineTransform.init(translationX: 0, y: frame.size.height);
+        transform = transform.scaledBy(x: 1.0, y: -1.0);
+        
+        var idx: CFIndex = -1;
+        for index in 0..<count {
+            let linePoint = origins[index];
+            let ctLine = unsafeBitCast(CFArrayGetValueAtIndex(lines, index), to: CTLine.self)
+            let flippedRect = self.getLineBounds(line: ctLine, point: linePoint);
+            let rect = flippedRect.applying(transform);
+            if (rect.contains(point)) {
+                let relativePoint = CGPoint.init(x: point.x - rect.minX - self.font!.pointSize/2.0,
+                                                 y: point.y - rect.minY);
+                
+                idx = CTLineGetStringIndexForPosition(ctLine, relativePoint);
+            }
+        }
+        return idx;
     }
+
     
     
     private func textCTFrame() -> CTFrame? {
@@ -58,7 +83,8 @@ class KW_AttributeTextData: NSObject {
     }
     
     private func attributedContentText() -> NSAttributedString {
-        
+    
+        self.saveHyperLinkRanges();
         var attributedContent: NSMutableAttributedString?
         var lineSpacing: CGFloat = self.lineSpacing!;
         let ctFont = CTFontCreateWithName((self.font?.fontName)! as CFString, (self.font?.pointSize)!, nil);
@@ -100,12 +126,36 @@ class KW_AttributeTextData: NSObject {
         attributedContent = NSMutableAttributedString.init(string: self.text!,
                                                            attributes: attributed);
         
-        self.saveHyperLinkTextRane(linkText: "势趋好", origin: self.text!);
+        self.addHyperLinkTextAttribute(attributedContent: attributedContent!);
         return attributedContent!;
     }
     
+    private func saveHyperLinkRanges() -> Void {
+        if self.hyperLinks != nil {
+            for key in self.hyperLinks!.keys {
+                self.saveHyperLinkTextRane(linkText: key, origin: self.text!);
+            }
+        }
+    }
     
-    func saveHyperLinkTextRane(linkText: String, origin: String) -> Void {
+    
+    private func addHyperLinkTextAttribute(attributedContent: NSMutableAttributedString) -> Void {
+        if self.allLinkTextRanges.values.count > 0 {
+            for key in (self.hyperLinks?.keys)! {
+                let values = self.allLinkTextRanges[key];
+                for value in values! {
+                    let range = value as! NSRange;
+                    let attributed = self.hyperLinks![key];
+                    if(attributedContent.string.count >= range.location + range.length && attributed != nil) {
+                        attributedContent.setAttributes(self.hyperLinks![key], range: range);
+                    }
+                }
+            }
+        }
+    }
+    
+    
+    private func saveHyperLinkTextRane(linkText: String, origin: String) -> Void {
         
         let NSOrigin = NSString.init(string: origin);
         let range = NSOrigin.range(of: linkText);
@@ -128,5 +178,14 @@ class KW_AttributeTextData: NSObject {
         } else {
             tempText = "";
         }
+    }
+    
+    func getLineBounds(line: CTLine, point: CGPoint) -> CGRect {
+        var ascent: CGFloat = 0.0;
+        var descent: CGFloat = 0.0;
+        var leading: CGFloat = 0.0;
+        let width: Double = CTLineGetTypographicBounds(line, &ascent, &descent, &leading);
+        let height: CGFloat = ascent + descent;
+        return CGRect.init(x: point.x, y: point.y - descent, width: CGFloat(width), height: height);
     }
 }

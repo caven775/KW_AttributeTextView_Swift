@@ -24,6 +24,11 @@ class ViewController: UIViewController {
         data.width = w;
         data.lineSpacing = 8;
         data.font = UIFont.systemFont(ofSize: 14);
+        data.hyperLinks = ["势趋好": [NSAttributedStringKey.foregroundColor: UIColor.green,
+                                         NSAttributedStringKey.font: UIFont.systemFont(ofSize: 18)],
+                           "根据测算": [NSAttributedStringKey.foregroundColor: UIColor.red,
+                                            NSAttributedStringKey.font: UIFont.systemFont(ofSize: 12)]];
+        
         data.kw_completedDataSetting();
         
         let frame = CGRect.init(x: x, y: 100, width: w, height: (data.textRealSize?.height)!)
